@@ -110,7 +110,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   USE kinds, ONLY: DP
   USE ions_base, ONLY : nat, ntyp => nsp, ityp, tau, zv, atm
   USE cell_base, ONLY: omega, alat, tpiba2, at, bg
-  USE constants, ONLY: tpi
+  USE constants, ONLY: tpi, pi
   USE run_info,  ONLY: title
   USE gvect, ONLY: ngm, g
   USE gvecs, ONLY : nls, nlsm
@@ -140,7 +140,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   INTEGER :: ig, ibnd, ik, io, na, j, ispin, nbndup, nbnddown, &
        nk, ngtot, ig7, ikk, iks, kpcnt, jks, nt, ijkb0, ikb, ih, jh, jkb, at_num, &
        nelec_tot, nelec_up, nelec_down, ii, igx, igy, igz, n_rgrid(3), &
-       nkqs, nr1s,nr2s,nr3s
+       nkqs, nr1s,nr2s,nr3s, nrxxs, ng, NPTS
   INTEGER, ALLOCATABLE :: indx(:), igtog(:), igtomin(:)
   LOGICAL :: exst, found
   REAL(DP) :: ek, eloc, enl, charge, etotefield
@@ -169,6 +169,9 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   REAL(DP) :: t1, t2, dt
   integer, allocatable :: rir(:)  
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
+  COMPLEX(DP), ALLOCATABLE :: jastrow(:)
+  REAL(DP) :: RS1,temp, arg, q2, norm
+  COMPLEX(DP) :: sf0,uep
 
   CHARACTER(256)          :: tmp,h5name,eigname,tmp_combo
   CHARACTER(iotk_attlenx) :: attr
@@ -234,6 +237,45 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   nr2s = dffts%nr2
   nr3s = dffts%nr3
   nxxs = dffts%nr1x * dffts%nr2x * dffts%nr3x
+  nrxxs= dffts%nnr ! dimension of allocated fft arrays local to this proc
+  NPTS = nr1s*nr2s*nr3s
+  
+  ! YY: Take cusp correction algorithm from BOPIMC
+  if (cusp_corr) then
+
+    if (ionode) then
+      write(stdout,*) 'Using cusp correction algorithm.'
+    endif
+    ALLOCATE( jastrow(nrxxs) )
+    jastrow(:)=(0.0_DP,0.0_DP)
+
+    ! Construct RPA Jastrow:
+    ! nls(i):       fft index of G vector-i
+    ! This is specific to hydrogen right now
+    do ng = 1, ngm
+      q2 = sum( ( g(:,ng) )**2 )*tpiba2
+      IF(ABS(q2) < 0.000001d0) CYCLE
+      sf0 = (0.0_DP,0.0_DP)
+      do na = 1, nat
+        arg = (g (1, ng) * tau (1, na) + g (2, ng) * tau (2, na) &
+                 + g (3, ng) * tau (3, na) ) * tpi
+         sf0= sf0 + CMPLX(cos (arg), -sin (arg),kind=DP)
+      enddo
+      RS1 = (3.0_DP*omega/(4.0_DP*pi*nelec))**(1.0_DP/3.0_DP)
+      temp = 12.0_DP/(RS1*RS1*RS1*q2*q2)
+      uep = -0.5_DP*temp/SQRT(1.0_DP + temp)
+      jastrow(nls(ng)) = sf0 * uep / nelec 
+      ! YY: is normalization necessary at this point?
+      jastrow(nls(ng)) = jastrow(nls(ng)) * dble(NPTS)/sqrt(omega)
+    enddo
+    CALL invfft ('Wave', jastrow, dffts)
+    do ik=1,nrxxs
+      jastrow(ik)=CDEXP(-jastrow(ik))
+    enddo
+    ! Finished Construct RPA Jastrow
+
+  endif ! cusp_corr
+
   allocate (igk_sym( npwx ), g2kin_sym ( npwx ) )
 
   if (ionode) then
@@ -1019,6 +1061,10 @@ CALL stop_clock( 'big_loop' )
 CALL start_clock( 'write_h5' )
   if(ionode) then
     CALL esh5_open_density(gint_den,ngm,nr1s,nr2s,nr3s)
+    if (cusp_corr) then
+      print *,"writing jastrow"
+      CALL esh5_write_jastrow(jastrow)
+    endif ! cusp_corr
     DO ispin = 1, nspin
        CALL esh5_write_density_g(ispin,rho%of_g(1,ispin))
     ENDDO
