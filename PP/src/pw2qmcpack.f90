@@ -1050,7 +1050,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
    ENDDO ! iks
   ENDDO ! ik
 
-endif ! nk
+  endif ! nk
 CALL stop_clock( 'big_loop' )
 #endif
   ! write charge density
@@ -1062,9 +1062,8 @@ CALL start_clock( 'write_h5' )
   if(ionode) then
     CALL esh5_open_density(gint_den,ngm,nr1s,nr2s,nr3s)
     if (cusp_corr) then
-      print *,"writing jastrow"
       CALL esh5_write_jastrow(jastrow)
-    endif ! cusp_corr
+    endif 
     DO ispin = 1, nspin
        CALL esh5_write_density_g(ispin,rho%of_g(1,ispin))
     ENDDO
@@ -1088,6 +1087,7 @@ CALL start_clock( 'write_h5' )
 CALL stop_clock( 'write_h5' )
 #endif
 
+  IF( ALLOCATED(jastrow) ) DEALLOCATE (jastrow)
   IF( ALLOCATED(igtog) ) DEALLOCATE (igtog)
   IF( ALLOCATED(igtomin) ) DEALLOCATE (igtomin)
   IF( ALLOCATED(indx) ) DEALLOCATE (indx)
