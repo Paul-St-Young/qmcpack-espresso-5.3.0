@@ -22,12 +22,12 @@ PROGRAM pw2qmcpack
   !
   IMPLICIT NONE
   INTEGER :: ios
-  LOGICAL :: write_psir, expand_kp
+  LOGICAL :: write_psir, expand_kp, cusp_corr
   REAL(DP) :: t1, t2, dt
   !
   CHARACTER(LEN=256), EXTERNAL :: trimcheck
 
-  NAMELIST / inputpp / prefix, outdir, write_psir, expand_kp
+  NAMELIST / inputpp / prefix, outdir, write_psir, expand_kp, cusp_corr
 #ifdef __PARA
   CALL mp_startup ( )
 #endif
@@ -44,6 +44,7 @@ PROGRAM pw2qmcpack
   prefix = 'pwscf'
   write_psir = .false.
   expand_kp = .false.
+  cusp_corr = .false.
   CALL get_environment_variable( 'ESPRESSO_TMPDIR', outdir )
   IF ( TRIM( outdir ) == ' ' ) outdir = './'
   ios = 0
@@ -63,6 +64,7 @@ PROGRAM pw2qmcpack
   CALL mp_bcast(tmp_dir, ionode_id, world_comm ) 
   CALL mp_bcast(write_psir, ionode_id, world_comm ) 
   CALL mp_bcast(expand_kp, ionode_id, world_comm ) 
+  CALL mp_bcast(cusp_corr, ionode_id, world_comm ) 
   !
   ! NAR Previously a call to read_file below, read_file_lite is much faster!
   CALL start_clock ( 'read_file_lite' )
@@ -72,7 +74,7 @@ PROGRAM pw2qmcpack
   CALL openfil_pp
   !
   CALL start_clock ( 'compute_qmcpack' )
-  CALL compute_qmcpack(write_psir, expand_kp)
+  CALL compute_qmcpack(write_psir, expand_kp, cusp_corr)
   CALL stop_clock ( 'compute_qmcpack' )
   !
   IF ( ionode ) THEN 
@@ -103,7 +105,7 @@ PROGRAM pw2qmcpack
 END PROGRAM pw2qmcpack
 
 
-SUBROUTINE compute_qmcpack(write_psir, expand_kp)
+SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
   USE kinds, ONLY: DP
   USE ions_base, ONLY : nat, ntyp => nsp, ityp, tau, zv, atm
@@ -134,7 +136,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp)
   USE symm_base,            ONLY : nsym, s, ftau
 
   IMPLICIT NONE
-  LOGICAL :: write_psir, expand_kp
+  LOGICAL :: write_psir, expand_kp, cusp_corr
   INTEGER :: ig, ibnd, ik, io, na, j, ispin, nbndup, nbnddown, &
        nk, ngtot, ig7, ikk, iks, kpcnt, jks, nt, ijkb0, ikb, ih, jh, jkb, at_num, &
        nelec_tot, nelec_up, nelec_down, ii, igx, igy, igz, n_rgrid(3), &
