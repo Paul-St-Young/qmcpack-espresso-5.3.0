@@ -28,3 +28,17 @@
 *.out
 *.app
 *.x
+
+# Compilation
+S3DE/
+bin/
+include/c_defs.h
+include/fft_defs.h
+install/config.log
+install/config.status
+install/configure.msg
+install/make_blas.inc
+install/make_lapack.inc
+install/make_wannier90.sys
+iotk
+make.sys
