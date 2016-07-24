@@ -266,7 +266,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
       uep = -0.5_DP*temp/SQRT(1.0_DP + temp)
       jastrow(nls(ng)) = sf0 * uep / nelec 
       ! YY: is normalization necessary at this point?
-      jastrow(nls(ng)) = jastrow(nls(ng)) * dble(NPTS)/sqrt(omega)
+      !jastrow(nls(ng)) = jastrow(nls(ng)) * dble(NPTS)/sqrt(omega)
     enddo
     CALL invfft ('Wave', jastrow, dffts)
     do ik=1,nrxxs
