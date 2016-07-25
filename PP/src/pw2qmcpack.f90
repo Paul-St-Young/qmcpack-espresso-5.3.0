@@ -169,7 +169,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   REAL(DP) :: t1, t2, dt
   integer, allocatable :: rir(:)  
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
-  COMPLEX(DP), ALLOCATABLE :: jastrow(:)
+  COMPLEX(DP), ALLOCATABLE :: jastrow(:), temppsic(:)
   REAL(DP) :: RS1,temp, arg, q2, norm
   COMPLEX(DP) :: sf0,uep
 
@@ -240,13 +240,19 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   nrxxs= dffts%nnr ! dimension of allocated fft arrays local to this proc
   NPTS = nr1s*nr2s*nr3s
   
-  ! YY: Take cusp correction algorithm from BOPIMC
+  ! YY: Construct RPA Jastrow following BOPIMC
   if (cusp_corr) then
+
+    RS1 = (3.0_DP*omega/(4.0_DP*pi*nelec))**(1.0_DP/3.0_DP)
 
     if (ionode) then
       write(stdout,*) 'Using cusp correction algorithm.'
+      write(stdout,*) 'omega = ', omega, ' NPTS = ', NPTS
+      write(stdout,*) 'Constructing RPA Jastrow with RS = ', RS1
+      write(stdout,*) 'tpiba2 = ', tpiba2, 'tpi = ', tpi
     endif
     ALLOCATE( jastrow(nrxxs) )
+    ALLOCATE( temppsic(nrxxs) )
     jastrow(:)=(0.0_DP,0.0_DP)
 
     ! Construct RPA Jastrow:
@@ -261,18 +267,16 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
                  + g (3, ng) * tau (3, na) ) * tpi
          sf0= sf0 + CMPLX(cos (arg), -sin (arg),kind=DP)
       enddo
-      RS1 = (3.0_DP*omega/(4.0_DP*pi*nelec))**(1.0_DP/3.0_DP)
       temp = 12.0_DP/(RS1*RS1*RS1*q2*q2)
       uep = -0.5_DP*temp/SQRT(1.0_DP + temp)
       jastrow(nls(ng)) = sf0 * uep / nelec 
-      ! YY: is normalization necessary at this point?
-      !jastrow(nls(ng)) = jastrow(nls(ng)) * dble(NPTS)/sqrt(omega)
     enddo
     CALL invfft ('Wave', jastrow, dffts)
     do ik=1,nrxxs
       jastrow(ik)=CDEXP(-jastrow(ik))
     enddo
     ! Finished Construct RPA Jastrow
+    ! jastrow is later written to h5 file with esh5_write_jastrow
 
   endif ! cusp_corr
 
@@ -852,6 +856,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   CALL start_clock ( 'big_loop' )
   if(nks .eq. 1) then ! treat 1 kpoint specially
     write(6,*) 'Only 1 Kpoint. By pass everything '
+    if (cusp_corr) CALL errore( "cusp correction not implemented for 1 kpoint" )
     ik=1
     CALL esh5_open_kpoint(ik)
     DO ispin = 1, nspin
@@ -990,6 +995,39 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
              eigpacked(igtomin(igk(1:npw)))=evc(1:npw,ibnd)
              !
            ENDIF ! expandkp
+
+          ! YY: steal cusp correction algorithm from BOPIMC
+          IF( cusp_corr) THEN
+            ! put DFT orbitals in real space
+            psic(:)=(0.d0,0.d0)
+            psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
+            CALL invfft ('Wave', psic, dffts)
+
+            ! divide orbitals by RPA Jastrow
+            do ii=1,nrxxs
+              psic(ii) = psic(ii)/jastrow(ii)*dble(NPTS)/sqrt(omega)
+            enddo
+            ! Fourier transform to get new coefficients
+            call fwfft('Wave', psic, dffts)
+
+            ! only keep coefficients < wfc
+            temppsic(:) = (0.0_DP,0.0_DP)
+            temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))*sqrt(omega)/dble(NPTS)
+            ! renormalize 
+            norm = 0.0_DP
+            do ii=1,npw
+              norm = norm + temppsic(nls(igk(ii)))*CONJG(temppsic(nls(igk(ii))))
+            enddo
+            IF(nproc_pool > 1) then
+              call mp_sum( norm, intra_pool_comm )
+            endif
+            norm = SQRT(norm)
+            psic(:) = (0.0_DP,0.0_DP)
+            psic(1:nrxxs) = temppsic(1:nrxxs)/norm
+
+            ! store new coefficients
+            eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
+          ENDIF
 
            CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
 
