@@ -471,7 +471,8 @@ void F77_FUNC_(esh5_write_jastrow,ESH5_WRITE_JASTROW)(const double* jastrow)
 {
   hsize_t dims[3];
   for(int i=0; i<3; ++i) dims[i] = num_grid[i];
-  herr_t ret=H5LTmake_dataset(h_ptcls,"jastrow",3,dims,H5T_NATIVE_DOUBLE,jastrow);
+  dims[3] = 2; // for complex values
+  herr_t ret=H5LTmake_dataset(h_ptcls,"jastrow",4,dims,H5T_NATIVE_DOUBLE,jastrow);
 }
 
 /** open density group and write its grid properties
