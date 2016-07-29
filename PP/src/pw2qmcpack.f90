@@ -170,7 +170,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   integer, allocatable :: rir(:)  
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
   COMPLEX(DP), ALLOCATABLE :: jastrow(:), temppsic(:)
-  REAL(DP) :: RS1,temp, arg, q2, norm
+  REAL(DP) :: RS1,temp, arg, q2
   COMPLEX(DP) :: sf0,uep
 
   CHARACTER(256)          :: tmp,h5name,eigname,tmp_combo
@@ -246,10 +246,8 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
     RS1 = (3.0_DP*omega/(4.0_DP*pi*nelec))**(1.0_DP/3.0_DP)
 
     if (ionode) then
-      write(stdout,*) 'Using cusp correction algorithm.'
-      write(stdout,*) 'omega = ', omega, ' NPTS = ', NPTS
-      write(stdout,*) 'Constructing RPA Jastrow with RS = ', RS1
-      write(stdout,*) 'tpiba2 = ', tpiba2, 'tpi = ', tpi
+      write(stdout,*) '    Using cusp correction algorithm.'
+      write(stdout,*) '    Constructing RPA Jastrow with RS = ', RS1
     endif
     ALLOCATE( jastrow(nrxxs) )
     ALLOCATE( temppsic(nrxxs) )
@@ -276,7 +274,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
       jastrow(ik)=CDEXP(-jastrow(ik))
     enddo
     ! Finished Construct RPA Jastrow
-    ! jastrow is later written to h5 file with esh5_write_jastrow
+    ! jastrow is later written to h5 file with esh5_write_fft_grid(jastrow,"jastrow")
 
   endif ! cusp_corr
 
@@ -997,37 +995,42 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
            ENDIF ! expandkp
 
           ! YY: steal cusp correction algorithm from BOPIMC
-          IF( cusp_corr) THEN
+          if (cusp_corr) then
+
             ! put DFT orbitals in real space
             psic(:)=(0.d0,0.d0)
             psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
-            CALL invfft ('Wave', psic, dffts)
+            call invfft ('Wave', psic, dffts)
+
+            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+              call esh5_write_fft_grid(psic,"beforecc")
+            endif
 
             ! divide orbitals by RPA Jastrow
             do ii=1,nrxxs
-              psic(ii) = psic(ii)/jastrow(ii)*dble(NPTS)/sqrt(omega)
+              psic(ii) = psic(ii)/jastrow(ii)
             enddo
+
             ! Fourier transform to get new coefficients
             call fwfft('Wave', psic, dffts)
 
             ! only keep coefficients < wfc
             temppsic(:) = (0.0_DP,0.0_DP)
-            temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))*sqrt(omega)/dble(NPTS)
-            ! renormalize 
-            norm = 0.0_DP
-            do ii=1,npw
-              norm = norm + temppsic(nls(igk(ii)))*CONJG(temppsic(nls(igk(ii))))
-            enddo
-            IF(nproc_pool > 1) then
-              call mp_sum( norm, intra_pool_comm )
-            endif
-            norm = SQRT(norm)
+            temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))
+
             psic(:) = (0.0_DP,0.0_DP)
-            psic(1:nrxxs) = temppsic(1:nrxxs)/norm
+            psic(1:nrxxs) = temppsic(1:nrxxs)
 
             ! store new coefficients
             eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
-          ENDIF
+
+            ! orbital after cc
+            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+              call invfft ('Wave', psic, dffts)
+              call esh5_write_fft_grid(psic,"aftercc")
+            endif
+
+          endif ! cusp_corr
 
            CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
 
@@ -1100,7 +1103,7 @@ CALL start_clock( 'write_h5' )
   if(ionode) then
     CALL esh5_open_density(gint_den,ngm,nr1s,nr2s,nr3s)
     if (cusp_corr) then
-      CALL esh5_write_jastrow(jastrow)
+      CALL esh5_write_fft_grid(jastrow,"jastrow")
     endif 
     DO ispin = 1, nspin
        CALL esh5_write_density_g(ispin,rho%of_g(1,ispin))
