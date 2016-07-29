@@ -465,14 +465,13 @@ void F77_FUNC_(esh5_open_density,ESH5_OPEN_DENSITY)(const int* gint
 		       &dim1,H5T_NATIVE_INT,ngm);
 }
 
-/** YY:write RPA jastrow
- */
-void F77_FUNC_(esh5_write_jastrow,ESH5_WRITE_JASTROW)(const double* jastrow)
+/* YY:write any complex-valued array on dffts to h_ptcl with name */
+void F77_FUNC_(esh5_write_fft_grid,ESH5_WRITE_FFT_GRID)(const double* fftgrid,char* name)
 {
   hsize_t dims[3];
   for(int i=0; i<3; ++i) dims[i] = num_grid[i];
   dims[3] = 2; // for complex values
-  herr_t ret=H5LTmake_dataset(h_ptcls,"jastrow",4,dims,H5T_NATIVE_DOUBLE,jastrow);
+  herr_t ret=H5LTmake_dataset(h_ptcls,name,4,dims,H5T_NATIVE_DOUBLE,fftgrid);
 }
 
 /** open density group and write its grid properties
