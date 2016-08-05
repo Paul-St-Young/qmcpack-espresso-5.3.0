@@ -854,19 +854,55 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   CALL start_clock ( 'big_loop' )
   if(nks .eq. 1) then ! treat 1 kpoint specially
     write(6,*) 'Only 1 Kpoint. By pass everything '
-    if (cusp_corr) CALL errore( "cusp correction not implemented for 1 kpoint" )
+
     ik=1
     CALL esh5_open_kpoint(ik)
     DO ispin = 1, nspin
         CALL esh5_open_spin(ispin)
 
         DO ibnd = 1, nbnd !!transform G to R
-           !psic(:)=(0.d0,0.d0)
-           !psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
-           !CALL esh5_write_psi_g(ibnd,psic,ngtot)
-           eigpacked(:)=(0.d0,0.d0)
-           eigpacked(igtomin(igk(1:npw)))=evc(1:npw,ibnd)
-           CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
+          eigpacked(:)=(0.d0,0.d0)
+          eigpacked(igtomin(igk(1:npw)))=evc(1:npw,ibnd)
+
+          ! YY: steal cusp correction algorithm from BOPIMC
+          if (cusp_corr) then
+
+            ! put DFT orbitals in real space
+            psic(:)=(0.d0,0.d0)
+            psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
+            call invfft ('Wave', psic, dffts)
+
+            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+              call esh5_write_fft_grid(psic,"beforecc")
+            endif
+
+            ! divide orbitals by RPA Jastrow
+            do ii=1,nrxxs
+              psic(ii) = psic(ii)/jastrow(ii)
+            enddo
+
+            ! Fourier transform to get new coefficients
+            call fwfft('Wave', psic, dffts)
+
+            ! only keep coefficients < wfc
+            temppsic(:) = (0.0_DP,0.0_DP)
+            temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))
+
+            psic(:) = (0.0_DP,0.0_DP)
+            psic(1:nrxxs) = temppsic(1:nrxxs)
+
+            ! store new coefficients
+            eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
+
+            ! orbital after cc
+            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+              call invfft ('Wave', psic, dffts)
+              call esh5_write_fft_grid(psic,"aftercc")
+            endif
+
+          endif ! cusp_corr
+
+          CALL esh5_write_psi_g(ibnd,eigpacked,ngtot)
        enddo
        CALL esh5_close_spin()
     enddo
