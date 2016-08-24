@@ -170,7 +170,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   integer, allocatable :: rir(:)  
   COMPLEX(DP), ALLOCATABLE :: tmp_evc(:)
   COMPLEX(DP), ALLOCATABLE :: jastrow(:), temppsic(:)
-  REAL(DP) :: RS1,temp, arg, q2
+  REAL(DP) :: RS1,temp, arg, q2, norm
   COMPLEX(DP) :: sf0,uep
 
   CHARACTER(256)          :: tmp,h5name,eigname,tmp_combo
@@ -888,8 +888,18 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
             temppsic(:) = (0.0_DP,0.0_DP)
             temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))
 
+            ! renormalize 
+            norm = 0.0_DP
+            do ii=1,npw
+              norm = norm + temppsic(nls(igk(ii)))*CONJG(temppsic(nls(igk(ii))))
+            enddo
+            IF(nproc_pool > 1) then
+              call mp_sum( norm, intra_pool_comm )
+            endif
+            norm = SQRT(norm)
+
             psic(:) = (0.0_DP,0.0_DP)
-            psic(1:nrxxs) = temppsic(1:nrxxs)
+            psic(1:nrxxs) = temppsic(1:nrxxs)/norm
 
             ! store new coefficients
             eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
@@ -1054,8 +1064,18 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
             temppsic(:) = (0.0_DP,0.0_DP)
             temppsic(nls(igk(1:npw)))=psic(nls(igk(1:npw)))
 
+            ! renormalize 
+            norm = 0.0_DP
+            do ii=1,npw
+              norm = norm + temppsic(nls(igk(ii)))*CONJG(temppsic(nls(igk(ii))))
+            enddo
+            IF(nproc_pool > 1) then
+              call mp_sum( norm, intra_pool_comm )
+            endif
+            norm = SQRT(norm)
+
             psic(:) = (0.0_DP,0.0_DP)
-            psic(1:nrxxs) = temppsic(1:nrxxs)
+            psic(1:nrxxs) = temppsic(1:nrxxs)/norm
 
             ! store new coefficients
             eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
