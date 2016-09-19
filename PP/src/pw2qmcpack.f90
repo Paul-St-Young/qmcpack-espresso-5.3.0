@@ -333,8 +333,10 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
          CALL davcio (evc, 2*nwordwfc, iunwfc, ik, - 1)
 
         DO ig =1, npw
-           IF( igk(ig) > 4*npwx ) & 
+           if( igk(ig) > 4*npwx ) then
+                print *,"npwx = ",npwx, " ig = ", ig, " igk(ig) = ", igk(ig)
                 CALL errore ('pw2qmcpack','increase allocation of index', ig)
+           endif
            indx( igk(ig) ) = 1
         ENDDO
      ENDDO
