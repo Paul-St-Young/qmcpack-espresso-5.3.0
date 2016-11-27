@@ -188,10 +188,10 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
   ! this limits independent definition of ecutrho to < 4*ecutwf
   ! four times npwx should be enough
-  ALLOCATE (indx (4*npwx) )
-  ALLOCATE (igtog (4*npwx) )
-  ALLOCATE (igtomin(4*npwx) )
-  ALLOCATE (tmp_evc(npwx) )
+  ALLOCATE (indx (6*npwx) )
+  ALLOCATE (igtog (6*npwx) )
+  ALLOCATE (igtomin(6*npwx) )
+  ALLOCATE (tmp_evc(2*npwx) )
 
   indx(:) = 0
   igtog(:) = 0
@@ -278,7 +278,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
   endif ! cusp_corr
 
-  allocate (igk_sym( npwx ), g2kin_sym ( npwx ) )
+  allocate (igk_sym( 2*npwx ), g2kin_sym ( 2*npwx ) )
 
   if (ionode) then
     if(expand_kp) then
@@ -333,7 +333,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
          CALL davcio (evc, 2*nwordwfc, iunwfc, ik, - 1)
 
         DO ig =1, npw
-           if( igk(ig) > 4*npwx ) then
+           if( igk(ig) > 6*npwx ) then
                 print *,"npwx = ",npwx, " ig = ", ig, " igk(ig) = ", igk(ig)
                 CALL errore ('pw2qmcpack','increase allocation of index', ig)
            endif
@@ -346,11 +346,11 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
     ngtot = 0
   ! igtomin maps indices from the full set of G-vectors to the
   ! minimal set which includes the G-spheres of all k-points
-    DO ig = 1, 4*npwx
+    DO ig = 1, 6*npwx
       IF( indx(ig) == 1 ) THEN
-	  ngtot = ngtot + 1
-	  igtog(ngtot) = ig
-	  igtomin(ig) = ngtot
+        ngtot = ngtot + 1
+        igtog(ngtot) = ig
+        igtomin(ig) = ngtot
       ENDIF
     ENDDO
   !   print *,my_pool_id,ngtot
