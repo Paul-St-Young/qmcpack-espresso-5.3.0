@@ -1074,8 +1074,8 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
            IF (write_psir) THEN
               psic(:)=(0.d0,0.d0)
-              psic(nls(igk_sym(1:npw_sym)))=tmp_evc(1:npw_sym)
-              if(gamma_only) psic(nlsm(igk_sym(1:npw_sym))) = CONJG(tmp_evc(1:npw_sym))
+              psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
+              if(gamma_only) psic(nlsm(igk(1:npw))) = CONJG(evc(1:npw,ibnd))
               !
               CALL invfft ('Wave', psic, dffts)
               !
