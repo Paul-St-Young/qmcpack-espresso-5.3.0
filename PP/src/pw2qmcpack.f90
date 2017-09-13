@@ -1030,9 +1030,9 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
             psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
             call invfft ('Wave', psic, dffts)
 
-            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
-              call esh5_write_fft_grid(psic,"beforecc")
-            endif
+            !if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+            !  call esh5_write_fft_grid(psic,"beforecc")
+            !endif
 
             ! divide orbitals by RPA Jastrow
             do ii=1,nrxxs
@@ -1052,11 +1052,11 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
             ! store new coefficients
             eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
 
-            ! orbital after cc
-            if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
-              call invfft ('Wave', psic, dffts)
-              call esh5_write_fft_grid(psic,"aftercc")
-            endif
+            !! orbital after cc
+            !if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+            !  call invfft ('Wave', psic, dffts)
+            !  call esh5_write_fft_grid(psic,"aftercc")
+            !endif
 
           endif ! cusp_corr
 
