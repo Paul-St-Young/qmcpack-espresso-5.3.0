@@ -257,12 +257,12 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
     ! nls(i):       fft index of G vector-i
     ! This is specific to hydrogen right now
     do ng = 1, ngm
-      q2 = sum( ( g_cart(:,ng) )**2 )
+      q2 = sum( ( g(:,ng) )**2 )*tpiba2
       IF(ABS(q2) < 0.000001d0) CYCLE
       sf0 = (0.0_DP,0.0_DP)
       do na = 1, nat
-        arg = (g_cart(1, ng) * tau (1, na) + g_cart(2, ng) * tau (2, na) &
-                 + g_cart(3, ng) * tau (3, na) )
+        arg = (g (1, ng) * tau (1, na) + g (2, ng) * tau (2, na) &
+                 + g (3, ng) * tau (3, na) ) * tpi
          sf0= sf0 + CMPLX(cos (arg), -sin (arg),kind=DP)
       enddo
       temp = 12.0_DP/(RS1*RS1*RS1*q2*q2)
@@ -702,9 +702,9 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
   DO ig=1, ngtot
     ig_c =igtog(ig)
-    g_cart(1,ig)=hmat(1,1)*g(1,ig_c)+hmat(2,1)*g(2,ig_c)+hmat(3,1)*g(3,ig_c)
-    g_cart(2,ig)=hmat(1,2)*g(1,ig_c)+hmat(2,2)*g(2,ig_c)+hmat(3,2)*g(3,ig_c)
-    g_cart(3,ig)=hmat(1,3)*g(1,ig_c)+hmat(2,3)*g(2,ig_c)+hmat(3,3)*g(3,ig_c)
+    g_cart(1,ig)=tpi/alat*g(1,ig_c)
+    g_cart(2,ig)=tpi/alat*g(2,ig_c)
+    g_cart(3,ig)=tpi/alat*g(3,ig_c)
     g_qmc(1,ig)=at(1,1)*g(1,ig_c)+at(2,1)*g(2,ig_c)+at(3,1)*g(3,ig_c)
     g_qmc(2,ig)=at(1,2)*g(1,ig_c)+at(2,2)*g(2,ig_c)+at(3,2)*g(3,ig_c)
     g_qmc(3,ig)=at(1,3)*g(1,ig_c)+at(2,3)*g(2,ig_c)+at(3,3)*g(3,ig_c)
