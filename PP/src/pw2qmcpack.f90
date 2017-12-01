@@ -1130,6 +1130,9 @@ CALL stop_clock( 'big_loop' )
 CALL start_clock( 'write_h5' )
   if(ionode) then
     CALL esh5_open_density(gint_den,ngm,nr1s,nr2s,nr3s)
+    if (cusp_corr) then
+      CALL esh5_write_fft_grid(jastrow,"jastrow")
+    endif 
     DO ispin = 1, nspin
        CALL esh5_write_density_g(ispin,rho%of_g(1,ispin))
     ENDDO
