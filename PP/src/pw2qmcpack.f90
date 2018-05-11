@@ -1142,29 +1142,14 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   endif ! nk
 CALL stop_clock( 'big_loop' )
 #endif
-  ! write charge density
-  ! ignore spin for the time being
-  !CALL esh5_write_rho(rho,rhog(1,1),ngm)
 
 #if defined(__HDF5)
-CALL start_clock( 'write_h5' )
-  if(ionode) then
-    CALL esh5_open_density(gint_den,ngm,nr1s,nr2s,nr3s)
-    if (cusp_corr) then
-      CALL esh5_write_fft_grid(jastrow,"jastrow")
-    endif 
-    DO ispin = 1, nspin
-       CALL esh5_write_density_g(ispin,rho%of_g(1,ispin))
-    ENDDO
-
-    CALL esh5_close_density()
-   endif 
-   
-   CALL esh5_close_electrons()
-   CALL esh5_close_file()
+  CALL start_clock( 'write_h5' )
+  CALL esh5_close_electrons()
+  CALL esh5_close_file()
       
   CALL mp_barrier( intra_image_comm )
-!     glue h5 together
+  ! glue h5 together
   if(ionode) then
     if(npool>1) then
       h5name = TRIM( prefix ) // '.pwscf.h5'
