@@ -22,12 +22,12 @@ PROGRAM pw2qmcpack
   !
   IMPLICIT NONE
   INTEGER :: ios
-  LOGICAL :: write_psir, expand_kp, cusp_corr
+  LOGICAL :: write_psir, expand_kp, cusp_corr, dump_jas
   REAL(DP) :: t1, t2, dt
   !
   CHARACTER(LEN=256), EXTERNAL :: trimcheck
 
-  NAMELIST / inputpp / prefix, outdir, write_psir, expand_kp, cusp_corr
+  NAMELIST / inputpp / prefix, outdir, write_psir, expand_kp, cusp_corr, dump_jas
 #ifdef __PARA
   CALL mp_startup ( )
 #endif
@@ -45,6 +45,7 @@ PROGRAM pw2qmcpack
   write_psir = .false.
   expand_kp = .false.
   cusp_corr = .false.
+  dump_jas = .false.
   CALL get_environment_variable( 'ESPRESSO_TMPDIR', outdir )
   IF ( TRIM( outdir ) == ' ' ) outdir = './'
   ios = 0
@@ -65,6 +66,7 @@ PROGRAM pw2qmcpack
   CALL mp_bcast(write_psir, ionode_id, world_comm ) 
   CALL mp_bcast(expand_kp, ionode_id, world_comm ) 
   CALL mp_bcast(cusp_corr, ionode_id, world_comm ) 
+  CALL mp_bcast(dump_jas, ionode_id, world_comm )
   !
   ! NAR Previously a call to read_file below, read_file_lite is much faster!
   CALL start_clock ( 'read_file_lite' )
@@ -74,7 +76,7 @@ PROGRAM pw2qmcpack
   CALL openfil_pp
   !
   CALL start_clock ( 'compute_qmcpack' )
-  CALL compute_qmcpack(write_psir, expand_kp, cusp_corr)
+  CALL compute_qmcpack(write_psir, expand_kp, cusp_corr, dump_jas)
   CALL stop_clock ( 'compute_qmcpack' )
   !
   IF ( ionode ) THEN 
@@ -105,7 +107,7 @@ PROGRAM pw2qmcpack
 END PROGRAM pw2qmcpack
 
 
-SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
+SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr, dump_jas)
 
   USE kinds, ONLY: DP
   USE ions_base, ONLY : nat, ntyp => nsp, ityp, tau, zv, atm
@@ -136,7 +138,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   USE symm_base,            ONLY : nsym, s, ftau
 
   IMPLICIT NONE
-  LOGICAL :: write_psir, expand_kp, cusp_corr
+  LOGICAL :: write_psir, expand_kp, cusp_corr, dump_jas
   INTEGER :: ig, ibnd, ik, io, na, j, ispin, nbndup, nbnddown, &
        nk, ngtot, ig7, ikk, iks, kpcnt, jks, nt, ijkb0, ikb, ih, jh, jkb, at_num, &
        nelec_tot, nelec_up, nelec_down, ii, igx, igy, igz, n_rgrid(3), &
@@ -258,7 +260,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
     if (ionode) then
       write(stdout,*) '    Using cusp correction algorithm.'
-      !write(stdout,*) ' atom = ', tmp, ' charge = ', zv(1)
+      write(stdout,'(a10,a5,a10,f10.6)') ' atom = ', tmp, ' charge = ', zv(1)
       write(stdout,*) '    Constructing RPA Jastrow with RS = ', RS1
     endif
     ALLOCATE( jastrow(nrxxs) )
@@ -267,7 +269,6 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
     ! Construct RPA Jastrow:
     ! nls(i):       fft index of G vector-i
-    ! This is specific to hydrogen right now
     do ng = 1, ngm
       q2 = sum( ( g(:,ng) )**2 )*tpiba2
       IF(ABS(q2) < 0.000001d0) CYCLE
@@ -1052,9 +1053,14 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
             psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
             call invfft ('Wave', psic, dffts)
 
-            !if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
-            !  call esh5_write_fft_grid(psic,"beforecc")
-            !endif
+            if (dump_jas) then
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(psic, "beforecc")
+              endif
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(jastrow, "jastrow")
+              endif
+            endif
 
             ! divide orbitals by RPA Jastrow
             do ii=1,nrxxs
@@ -1083,12 +1089,6 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
 
             ! store new coefficients
             eigpacked(igtomin(igk(1:npw))) = psic(nls(igk(1:npw)))
-
-            !! orbital after cc
-            !if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
-            !  call invfft ('Wave', psic, dffts)
-            !  call esh5_write_fft_grid(psic,"aftercc")
-            !endif
 
           endif ! cusp_corr
 
