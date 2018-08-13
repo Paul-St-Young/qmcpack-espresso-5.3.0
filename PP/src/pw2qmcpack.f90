@@ -243,10 +243,22 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
   ! YY: Construct RPA Jastrow following BOPIMC
   if (cusp_corr) then
 
+    ! check that cusp correction can be applied
+    if (ntyp .ne. 1) then
+      CALL errore('pw2qmcpack', 'cusp correction requires a single type of ion, has ', ntyp)
+    endif
+
+    tmp = TRIM(atm(1))
+    if (atomic_number(tmp) .ne. zv(1)) then
+      CALL errore('pw2qmcpack', 'cusp correction require a full-core calculation')
+    endif
+
+    ! construct RPA e-I jastrow
     RS1 = (3.0_DP*omega/(4.0_DP*pi*nelec))**(1.0_DP/3.0_DP)
 
     if (ionode) then
       write(stdout,*) '    Using cusp correction algorithm.'
+      !write(stdout,*) ' atom = ', tmp, ' charge = ', zv(1)
       write(stdout,*) '    Constructing RPA Jastrow with RS = ', RS1
     endif
     ALLOCATE( jastrow(nrxxs) )
@@ -265,7 +277,7 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr)
                  + g (3, ng) * tau (3, na) ) * tpi
          sf0= sf0 + CMPLX(cos (arg), -sin (arg),kind=DP)
       enddo
-      temp = 12.0_DP/(RS1*RS1*RS1*q2*q2)
+      temp = zv(1)*12.0_DP/(RS1*RS1*RS1*q2*q2)
       uep = -0.5_DP*temp/SQRT(1.0_DP + temp)
       jastrow(nls(ng)) = sf0 * uep / nelec 
     enddo
