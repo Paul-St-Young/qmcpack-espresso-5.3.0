@@ -278,8 +278,8 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr, dump_jas)
                  + g (3, ng) * tau (3, na) ) * tpi
          sf0= sf0 + CMPLX(cos (arg), -sin (arg),kind=DP)
       enddo
-      temp = zv(1)*12.0_DP/(RS1*RS1*RS1*q2*q2)
-      uep = -0.5_DP*temp/SQRT(1.0_DP + temp)
+      temp = 12.0_DP/(RS1*RS1*RS1*q2*q2)
+      uep = -zv(1)*0.5_DP*temp/SQRT(1.0_DP + temp)
       jastrow(nls(ng)) = sf0 * uep / nelec 
     enddo
     CALL invfft ('Wave', jastrow, dffts)
@@ -886,11 +886,25 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr, dump_jas)
             psic(:)=(0.d0,0.d0)
             psic(nls(igk(1:npw)))=evc(1:npw,ibnd)
             call invfft ('Wave', psic, dffts)
+            if (dump_jas) then
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(psic, "beforecc")
+              endif
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(jastrow, "jastrow")
+              endif
+            endif
 
             ! divide orbitals by RPA Jastrow
             do ii=1,nrxxs
               psic(ii) = psic(ii)/jastrow(ii)
             enddo
+
+            if (dump_jas) then
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(psic, "aftercc")
+              endif
+            endif
 
             ! Fourier transform to get new coefficients
             call fwfft('Wave', psic, dffts)
@@ -1066,6 +1080,12 @@ SUBROUTINE compute_qmcpack(write_psir, expand_kp, cusp_corr, dump_jas)
             do ii=1,nrxxs
               psic(ii) = psic(ii)/jastrow(ii)
             enddo
+
+            if (dump_jas) then
+              if ((ik .eq. 1) .and. (ibnd .eq. 1)) then
+                call esh5_write_fft_grid(psic, "aftercc")
+              endif
+            endif
 
             ! Fourier transform to get new coefficients
             call fwfft('Wave', psic, dffts)
